@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Loop - Connect & Create (Demo)</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet for the interactive map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- React & Babel for the application logic -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* Ensure the map container has a defined height */
+        #map { height: 100%; width: 100%; z-index: 0;}
+        .leaflet-container { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Mock Data (Replaces Firebase) ---
+        const mockSkills = [
+            {
+                id: 1,
+                title: "Sourdough Baking Basics",
+                description: "I can show you how to maintain a starter and bake your first loaf. It's easier than you think!",
+                category: "Cooking",
+                sharerEmail: "jane.doe@email.com",
+                location: { latitude: -33.87, longitude: 151.21 }
+            },
+            {
+                id: 2,
+                title: "Beginner Guitar Chords",
+                description: "Learn the 4 basic chords (G, C, D, Em) that will let you play hundreds of songs.",
+                category: "Music",
+                sharerEmail: "john.smith@email.com",
+                location: { latitude: -33.865, longitude: 151.205 }
+            },
+            {
+                id: 3,
+                title: "Houseplant Repotting 101",
+                description: "Got a root-bound plant? I'll bring the soil and pots, you bring the plant!",
+                category: "Gardening",
+                sharerEmail: "alex.ray@email.com",
+                location: { latitude: -33.875, longitude: 151.215 }
+            }
+        ];
+
+        // --- Helper Components ---
+        const Modal = ({ children, onClose }) => (
+            <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 relative">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    {children}
+                </div>
+            </div>
+        );
+
+        const Spinner = () => (
+             <div className="flex justify-center items-center h-full w-full">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+        );
+
+        // --- Main App Component ---
+        function App() {
+            const [skills, setSkills] = useState(mockSkills);
+            const [selectedSkill, setSelectedSkill] = useState(null);
+            const [isAddingSkill, setIsAddingSkill] = useState(false);
+            const [userLocation, setUserLocation] = useState(null);
+            
+            // --- Geolocation ---
+            useEffect(() => {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        setUserLocation({
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        });
+                    },
+                    (error) => {
+                        console.error("Error getting location", error);
+                        // Default to a known location if permission denied
+                        setUserLocation({ lat: -33.8688, lng: 151.2093 }); // Sydney
+                    },
+                    { enableHighAccuracy: true }
+                );
+            }, []);
+
+            // --- Handlers ---
+            const handleAddSkill = (skillData) => {
+                if (!userLocation) {
+                    alert("Cannot get your location to post a skill.");
+                    return;
+                }
+                
+                const fuzzyLat = userLocation.lat + (Math.random() - 0.5) * 0.005;
+                const fuzzyLng = userLocation.lng + (Math.random() - 0.5) * 0.005;
+
+                const newSkill = {
+                    ...skillData,
+                    id: Date.now(), // Simple unique ID
+                    sharerEmail: "you@email.com", // Simulated user
+                    location: { latitude: fuzzyLat, longitude: fuzzyLng },
+                };
+
+                setSkills(prevSkills => [...prevSkills, newSkill]);
+                setIsAddingSkill(false);
+            };
+            
+            const handleStartChat = () => {
+                alert("Chat functionality is disabled in this demo version. In the full app, this would open a private chat!");
+                setSelectedSkill(null);
+            };
+
+            const AddSkillModal = () => (
+                <Modal onClose={() => setIsAddingSkill(false)}>
+                    <form onSubmit={(e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.target);
+                        const skillData = Object.fromEntries(formData.entries());
+                        handleAddSkill(skillData);
+                    }} className="space-y-4">
+                        <h2 className="text-2xl font-bold text-gray-800">Share a New Skill</h2>
+                        <div>
+                            <label htmlFor="title" className="block text-sm font-medium text-gray-700">Skill Title</label>
+                            <input type="text" name="title" id="title" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., Sourdough Baking Basics" />
+                        </div>
+                        <div>
+                            <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
+                            <textarea name="description" id="description" rows="3" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="What will you teach?"></textarea>
+                        </div>
+                        <div>
+                            <label htmlFor="category" className="block text-sm font-medium text-gray-700">Category</label>
+                            <input type="text" name="category" id="category" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., Cooking, Music, Tech" />
+                        </div>
+                        <button type="submit" className="w-full py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Post Skill (Demo)</button>
+                    </form>
+                </Modal>
+            );
+            
+            const SkillDetailModal = () => (
+                <Modal onClose={() => setSelectedSkill(null)}>
+                    <div className="space-y-4">
+                        <span className="inline-block bg-indigo-100 text-indigo-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">{selectedSkill.category}</span>
+                        <h2 className="text-3xl font-bold text-gray-900">{selectedSkill.title}</h2>
+                        <p className="text-gray-600">{selectedSkill.description}</p>
+                        <div className="border-t pt-4">
+                            <p className="text-sm text-gray-500">Shared by: <span className="font-medium text-gray-700">{selectedSkill.sharerEmail}</span></p>
+                        </div>
+                        <button onClick={handleStartChat} className="w-full py-3 px-4 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">Request a Lesson</button>
+                    </div>
+                </Modal>
+            );
+            
+            const MapComponent = () => {
+                const mapRef = useRef(null);
+                const isMapInitialized = useRef(false);
+
+                useEffect(() => {
+                    if (userLocation && !isMapInitialized.current) {
+                        const map = L.map('map').setView([userLocation.lat, userLocation.lng], 14);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        }).addTo(map);
+                        mapRef.current = map;
+                        isMapInitialized.current = true;
+                        
+                        // Add user location marker
+                        L.marker([userLocation.lat, userLocation.lng], {
+                           icon: L.divIcon({
+                                className: 'bg-indigo-500 w-4 h-4 rounded-full border-4 border-white shadow-lg',
+                                iconSize: [12, 12]
+                            })
+                        }).addTo(map).bindPopup("Your Location").openPopup();
+                    }
+                }, [userLocation]);
+
+                useEffect(() => {
+                    if (mapRef.current) {
+                        // Clear old markers
+                        mapRef.current.eachLayer((layer) => {
+                           if (layer instanceof L.Marker && (!layer.options.icon || !layer.options.icon.options.className.includes('bg-indigo-500'))) {
+                                mapRef.current.removeLayer(layer);
+                            }
+                        });
+
+                        // Add new skill markers
+                        skills.forEach(skill => {
+                            if (skill.location) {
+                                L.marker([skill.location.latitude, skill.location.longitude]).addTo(mapRef.current)
+                                    .on('click', () => setSelectedSkill(skill));
+                            }
+                        });
+                    }
+                }, [skills, userLocation]);
+
+                return <div id="map" className="h-full w-full"></div>;
+            };
+
+            // --- Render Logic ---
+            if (!userLocation) {
+                return <div className="h-screen w-screen flex flex-col justify-center items-center bg-gray-100"><Spinner /><p className="mt-4 text-gray-600">Getting your location...</p></div>;
+            }
+            
+            return (
+                <div className="h-screen w-screen relative">
+                    <MapComponent />
+                    <div className="absolute top-4 right-4 z-10">
+                        <div className="bg-white text-gray-700 px-4 py-2 rounded-lg shadow-lg font-semibold">Demo Mode</div>
+                    </div>
+                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
+                        <button onClick={() => setIsAddingSkill(true)} className="px-6 py-4 bg-indigo-600 text-white font-bold rounded-full shadow-2xl hover:bg-indigo-700 transition-transform transform hover:scale-110">
+                            + Share a Skill
+                        </button>
+                    </div>
+
+                    {isAddingSkill && <AddSkillModal />}
+                    {selectedSkill && <SkillDetailModal />}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
